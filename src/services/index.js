@@ -68,12 +68,8 @@ export const loginFunction = (username, password) => {
 };
 
 export const getProduct = () => {
-  const myHeaders = new Headers();
-  getToken && myHeaders.append("Authorization", `Bearer ${getToken()}`);
-
   const requestOptions = {
     method: "GET",
-    headers: myHeaders,
     redirect: "follow",
   };
 

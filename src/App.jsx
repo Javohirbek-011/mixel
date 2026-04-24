@@ -7,6 +7,8 @@ import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import { getProduct, getCategories, getBrands } from "./services";
 import Card from "./components/Card";
+import ProductDetail from "./pages/ProductDetail";
+import Cart from "./pages/Cart";
 export const DataContext = createContext();
 function App() {
   const [product, setProduct] = useState([]);
@@ -51,6 +53,8 @@ function App() {
             <Route path="/signup" element={<SignUp />} />
             <Route path="/login" element={<Login />} />
             <Route path="/cards" element={<Card />} />
+            <Route path="/product/:id" element={<ProductDetail />} />
+            <Route path="/cart" element={<Cart />} />
           </Routes>
           <Footer />
         </DataContext.Provider>
