@@ -1,288 +1,387 @@
-import React, { useState } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { FiChevronRight, FiTrash2, FiMinus, FiPlus, FiTruck, FiShield } from "react-icons/fi";
+import {
+  FiChevronRight, FiTrash2, FiMinus, FiPlus,
+  FiTruck, FiShield, FiShoppingCart, FiPhone, FiUser,
+} from "react-icons/fi";
+import { DataContext } from "../App";
+import { updateCartItem, removeCartItem, createOrder } from "../services";
 import "../styles/cart.css";
 
-const MOCK_ITEMS = [
-  { id: 18, name: "S20 Ultra 12/256 GB", price: 3000000, qty: 1, image: "https://abzzvx.pythonanywhere.com/media/images/s20u_bdBLWF6.jpg" },
-  { id: 19, name: "Blender", price: 250000, qty: 1, image: "https://abzzvx.pythonanywhere.com/media/images/blender.jpg" },
-  { id: 20, name: "Simsiz quloqchinlar", price: 49000, qty: 1, image: "https://abzzvx.pythonanywhere.com/media/images/pods.jpg" },
+const PAYMENT_TYPES = [
+  {
+    id: "payme",
+    label: "Payme",
+    desc: "Online to'lov",
+    color: "#00AAFF",
+    icon: (
+      <svg viewBox="0 0 40 40" fill="none" width="32" height="32">
+        <rect width="40" height="40" rx="8" fill="#00AAFF"/>
+        <text x="50%" y="55%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">PAY</text>
+      </svg>
+    ),
+  },
+  {
+    id: "uzcard",
+    label: "UZCARD / HUMO",
+    desc: "Bank kartasi",
+    color: "#1A56DB",
+    icon: (
+      <svg viewBox="0 0 40 40" fill="none" width="32" height="32">
+        <rect width="40" height="40" rx="8" fill="#1A56DB"/>
+        <rect x="6" y="13" width="28" height="14" rx="2" fill="white" fillOpacity="0.2"/>
+        <rect x="6" y="19" width="28" height="3" fill="white" fillOpacity="0.5"/>
+        <rect x="6" y="24" width="10" height="2" rx="1" fill="white"/>
+      </svg>
+    ),
+  },
+  {
+    id: "cash",
+    label: "Naqd pul",
+    desc: "Yetkazganda",
+    color: "#16A34A",
+    icon: (
+      <svg viewBox="0 0 40 40" fill="none" width="32" height="32">
+        <rect width="40" height="40" rx="8" fill="#16A34A"/>
+        <rect x="7" y="13" width="26" height="14" rx="2" fill="white" fillOpacity="0.25"/>
+        <circle cx="20" cy="20" r="5" fill="white" fillOpacity="0.6"/>
+        <text x="50%" y="55%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">$</text>
+      </svg>
+    ),
+  },
+  {
+    id: "installment",
+    label: "Bo'lib to'lash",
+    desc: "0% foiz",
+    color: "#7C3AED",
+    icon: (
+      <svg viewBox="0 0 40 40" fill="none" width="32" height="32">
+        <rect width="40" height="40" rx="8" fill="#7C3AED"/>
+        <text x="50%" y="52%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="18" fontWeight="bold">%</text>
+      </svg>
+    ),
+  },
 ];
 
-const REGIONS = ["Toshkent viloyati", "Andijon", "Farg'ona", "Namangan", "Samarqand", "Buxoro", "Xorazm", "Surxondaryo", "Qashqadaryo", "Navoiy", "Jizzax", "Sirdaryo", "Qoraqalpog'iston"];
-
 export default function Cart() {
-  const [items, setItems] = useState(MOCK_ITEMS);
+  const { token, cartItems, refreshCart } = useContext(DataContext);
+
   const [payment, setPayment] = useState("");
   const [phone, setPhone] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [region, setRegion] = useState("");
-  const [district, setDistrict] = useState("");
-  const [address, setAddress] = useState("");
-  const [floor, setFloor] = useState("");
-  const [date, setDate] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const [updatingId, setUpdatingId] = useState(null);
 
-  const updateQty = (id, delta) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, qty: Math.max(1, item.qty + delta) } : item
-      )
+  useEffect(() => {
+    if (token) refreshCart(token);
+  }, [token]);
+
+  if (!token) {
+    return (
+      <main className="cart-page">
+        <div className="cart-container">
+          <div className="cart-empty-state">
+            <FiShoppingCart className="cart-empty-icon" />
+            <h2>Savatcha bo'sh</h2>
+            <p>Xarid qilish uchun avval tizimga kiring</p>
+            <Link to="/login" className="cart-login-btn">Kirish</Link>
+          </div>
+        </div>
+      </main>
     );
+  }
+
+  const handleQty = async (item, delta) => {
+    const newAmt = Math.max(1, item.amount + delta);
+    if (newAmt === item.amount) return;
+    setUpdatingId(item.id);
+    await updateCartItem(token, item.id, newAmt);
+    await refreshCart(token);
+    setUpdatingId(null);
   };
 
-  const removeItem = (id) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  const handleRemove = async (itemId) => {
+    setUpdatingId(itemId);
+    await removeCartItem(token, itemId);
+    await refreshCart(token);
+    setUpdatingId(null);
   };
 
-  const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const formatPrice = (p) => Number(p).toLocaleString("ru-RU");
+  const total = cartItems.reduce(
+    (sum, item) => sum + parseFloat(item.total_price || item.product_price || 0), 0
+  );
+  const totalQty = cartItems.reduce((s, i) => s + (i.amount || 1), 0);
+  const fmt = (p) => Number(p).toLocaleString("ru-RU");
+
+  const handleCheckout = async (e) => {
+    e.preventDefault();
+    setCheckoutError("");
+    if (!firstName || !lastName || !phone) {
+      setCheckoutError("Ism, familiya va telefon raqamni kiriting.");
+      return;
+    }
+    if (!payment) {
+      setCheckoutError("To'lov usulini tanlang.");
+      return;
+    }
+    if (cartItems.length === 0) {
+      setCheckoutError("Savatcha bo'sh.");
+      return;
+    }
+    setCheckoutLoading(true);
+    const cartItemIds = cartItems.map((i) => i.id);
+    const result = await createOrder(token, cartItemIds);
+    setCheckoutLoading(false);
+
+    if (result?.order_id || result?.id) {
+      setCheckoutSuccess(true);
+      await refreshCart(token);
+    } else {
+      const errMsg = result
+        ? Object.values(result).flat().join(" ")
+        : "Xatolik yuz berdi.";
+      setCheckoutError(errMsg || "Xatolik yuz berdi.");
+    }
+  };
+
+  if (checkoutSuccess) {
+    return (
+      <main className="cart-page">
+        <div className="cart-container">
+          <div className="checkout-success">
+            <div className="success-checkmark">
+              <svg viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="25" fill="none" />
+                <path fill="none" d="M14 27l8 8 16-16" />
+              </svg>
+            </div>
+            <h2>Buyurtma qabul qilindi!</h2>
+            <p>Tez orada siz bilan bog'lanamiz.</p>
+            <Link to="/" className="success-home-btn">Bosh sahifaga qaytish →</Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="cart-page">
       <div className="cart-container">
-
         <nav className="cart-breadcrumb">
-          <Link to="/">Home</Link>
+          <Link to="/">Bosh sahifa</Link>
           <FiChevronRight />
-          <span>Make a purchase</span>
+          <span>Savatcha</span>
         </nav>
 
-        <h1 className="cart-title">Make a purchase</h1>
+        {cartItems.length === 0 ? (
+          <div className="cart-empty-state">
+            <FiShoppingCart className="cart-empty-icon" />
+            <h2>Savatcha bo'sh</h2>
+            <p>Mahsulotlarni savatchaga qo'shing</p>
+            <Link to="/" className="cart-login-btn">Xarid qilish →</Link>
+          </div>
+        ) : (
+          <div className="cart-layout">
+            {/* ── LEFT ── */}
+            <div className="cart-left">
 
-        <div className="cart-layout">
-          {/* LEFT COLUMN */}
-          <div className="cart-left">
-
-            {/* STEP 1 */}
-            <div className="cart-step">
-              <div className="cart-step-header">
-                <div className="step-badge">1</div>
-                <h2>Your order</h2>
-                <button className="cart-change-btn">Change</button>
-              </div>
-
-              <div className="cart-items">
-                {items.length === 0 ? (
-                  <div className="cart-empty">
-                    <p>Your cart is empty</p>
-                    <Link to="/" className="cart-empty-link">Continue shopping →</Link>
-                  </div>
-                ) : (
-                  items.map((item) => (
-                    <div key={item.id} className="cart-item">
+              {/* Items */}
+              <div className="cart-card">
+                <div className="cart-card-title">
+                  <FiShoppingCart />
+                  <span>Savatcha</span>
+                  <span className="cart-card-badge">{totalQty}</span>
+                </div>
+                <div className="cart-items">
+                  {cartItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`cart-item ${updatingId === item.id ? "cart-item-updating" : ""}`}
+                    >
                       <div className="cart-item-img">
-                        <img src={item.image} alt={item.name}
-                          onError={(e) => { e.target.src = "/telephone.png"; }} />
+                        <img
+                          src={item.main_image}
+                          alt={item.product_name}
+                          onError={(e) => { e.target.src = "/telephone.png"; }}
+                        />
                       </div>
-                      <div className="cart-item-name">{item.name}</div>
+                      <div className="cart-item-info">
+                        <p className="cart-item-name">{item.product_name}</p>
+                        <p className="cart-item-unit">{fmt(item.product_price)} so'm / dona</p>
+                      </div>
                       <div className="cart-item-controls">
-                        <button className="qty-btn" onClick={() => updateQty(item.id, -1)}>
+                        <button type="button" className="qty-btn"
+                          onClick={() => handleQty(item, -1)}
+                          disabled={updatingId === item.id}>
                           <FiMinus />
                         </button>
-                        <span className="qty-num">{item.qty}</span>
-                        <button className="qty-btn" onClick={() => updateQty(item.id, 1)}>
+                        <span className="qty-num">{item.amount}</span>
+                        <button type="button" className="qty-btn"
+                          onClick={() => handleQty(item, 1)}
+                          disabled={updatingId === item.id}>
                           <FiPlus />
                         </button>
                       </div>
                       <div className="cart-item-price">
-                        {formatPrice(item.price * item.qty)} сум
+                        {fmt(item.total_price || item.product_price)} so'm
                       </div>
-                      <button className="cart-item-delete" onClick={() => removeItem(item.id)}>
+                      <button type="button" className="cart-item-delete"
+                        onClick={() => handleRemove(item.id)}
+                        disabled={updatingId === item.id}>
                         <FiTrash2 />
                       </button>
                     </div>
-                  ))
+                  ))}
+                </div>
+              </div>
+
+              {/* Contact */}
+              <div className="cart-card">
+                <div className="cart-card-title">
+                  <FiUser />
+                  <span>Kontakt ma'lumotlar</span>
+                </div>
+                <div className="contact-grid">
+                  <div className="input-group">
+                    <label>Ism *</label>
+                    <input
+                      type="text"
+                      placeholder="Ismingiz"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label>Familiya *</label>
+                    <input
+                      type="text"
+                      placeholder="Familiyangiz"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
+                  </div>
+                  <div className="input-group full-width">
+                    <label>Telefon raqam *</label>
+                    <div className="phone-input-wrap">
+                      <span className="phone-prefix"><FiPhone /> +998</span>
+                      <input
+                        type="tel"
+                        placeholder="90 123 45 67"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment */}
+              <div className="cart-card">
+                <div className="cart-card-title">
+                  <span className="cart-card-title-icon">💳</span>
+                  <span>To'lov usulini tanlang</span>
+                </div>
+                <div className="payment-grid">
+                  {PAYMENT_TYPES.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`payment-tile ${payment === m.id ? "selected" : ""}`}
+                      onClick={() => setPayment(m.id)}
+                      style={{ "--accent": m.color }}
+                    >
+                      <div className="payment-tile-top">
+                        <div className="payment-tile-icon">{m.icon}</div>
+                        {payment === m.id && (
+                          <span className="payment-tile-check">✓</span>
+                        )}
+                      </div>
+                      <span className="payment-tile-label">{m.label}</span>
+                      <span className="payment-tile-desc">{m.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            {/* ── RIGHT: SUMMARY ── */}
+            <div className="cart-right">
+              <form className="order-summary" onSubmit={handleCheckout}>
+                <h3 className="summary-title">Buyurtma</h3>
+
+                <div className="summary-items">
+                  {cartItems.map((item) => (
+                    <div key={item.id} className="summary-item-row">
+                      <img
+                        src={item.main_image}
+                        alt={item.product_name}
+                        className="summary-item-img"
+                        onError={(e) => { e.target.src = "/telephone.png"; }}
+                      />
+                      <span className="summary-item-name">{item.product_name}</span>
+                      <span className="summary-item-qty">×{item.amount}</span>
+                      <span className="summary-item-price">
+                        {fmt(item.total_price || item.product_price)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="summary-divider" />
+
+                <div className="summary-rows">
+                  <div className="summary-row">
+                    <span>Mahsulotlar ({totalQty})</span>
+                    <span>{fmt(total)} so'm</span>
+                  </div>
+                  <div className="summary-row">
+                    <span>Yetkazib berish</span>
+                    <span className="summary-free">BEPUL</span>
+                  </div>
+                </div>
+
+                <div className="summary-divider" />
+
+                <div className="summary-total-row">
+                  <span>Jami</span>
+                  <span className="summary-total">{fmt(total)} so'm</span>
+                </div>
+
+                {/* Selected payment badge */}
+                {payment && (
+                  <div className="selected-payment-badge">
+                    {PAYMENT_TYPES.find((p) => p.id === payment)?.label} tanlandi ✓
+                  </div>
                 )}
-              </div>
-            </div>
 
-            <div className="cart-divider" />
+                {checkoutError && (
+                  <p className="checkout-error">{checkoutError}</p>
+                )}
 
-            {/* STEP 2 */}
-            <div className="cart-step">
-              <div className="cart-step-header">
-                <div className="step-badge">2</div>
-                <h2>Your details</h2>
-              </div>
-              <div className="cart-form">
-                <div className="form-row">
-                  <input
-                    className="form-input full"
-                    type="tel"
-                    placeholder="Phone number *"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </div>
-                <div className="form-row two-col">
-                  <input
-                    className="form-input"
-                    type="text"
-                    placeholder="First name **"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                  />
-                  <input
-                    className="form-input"
-                    type="text"
-                    placeholder="Last name **"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="cart-divider" />
-
-            {/* STEP 3 */}
-            <div className="cart-step">
-              <div className="cart-step-header">
-                <div className="step-badge">3</div>
-                <h2>Select a payment method</h2>
-              </div>
-              <div className="payment-grid">
-                {["Payment via Payme", "Online (UZCARD/HUMO)", "Cash on delivery", "Installment plan"].map((method) => (
-                  <label key={method} className={`payment-option ${payment === method ? "selected" : ""}`}>
-                    <input
-                      type="radio"
-                      name="payment"
-                      value={method}
-                      checked={payment === method}
-                      onChange={() => setPayment(method)}
-                    />
-                    <span className="radio-dot" />
-                    <span>{method}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="cart-divider" />
-
-            {/* STEP 4 */}
-            <div className="cart-step">
-              <div className="cart-step-header">
-                <div className="step-badge">4</div>
-                <h2>Method of obtaining</h2>
-              </div>
-
-              <div className="city-label">YOUR CITY</div>
-              <div className="city-options">
-                <button className="city-btn active">
-                  <span className="city-dot" />
-                  Tashkent
+                <button
+                  type="submit"
+                  className="checkout-btn"
+                  disabled={checkoutLoading || !payment}
+                >
+                  {checkoutLoading ? (
+                    <span className="checkout-spinner" />
+                  ) : (
+                    "Buyurtma berish"
+                  )}
                 </button>
-              </div>
 
-              <div className="cart-form" style={{ marginTop: 16 }}>
-                <div className="form-row two-col">
-                  <div className="select-wrap">
-                    <select
-                      className="form-select"
-                      value={region}
-                      onChange={(e) => setRegion(e.target.value)}
-                    >
-                      <option value="">Region / Oblast *</option>
-                      {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
-                  <div className="select-wrap">
-                    <select
-                      className="form-select"
-                      value={district}
-                      onChange={(e) => setDistrict(e.target.value)}
-                    >
-                      <option value="">District / City *</option>
-                      <option>Yunusobod</option>
-                      <option>Chilonzor</option>
-                      <option>Mirzo Ulug'bek</option>
-                      <option>Shayxontohur</option>
-                    </select>
-                  </div>
+                <div className="summary-perks">
+                  <div className="summary-perk"><FiTruck /><span>Bepul yetkazib berish</span></div>
+                  <div className="summary-perk"><FiShield /><span>Xavfsiz to'lov</span></div>
                 </div>
-
-                <div className="form-row two-col">
-                  <input
-                    className="form-input"
-                    style={{ flex: 2 }}
-                    type="text"
-                    placeholder="Detailed Address (Street, House) *"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                  />
-                  <input
-                    className="form-input"
-                    type="text"
-                    placeholder="Floor"
-                    value={floor}
-                    onChange={(e) => setFloor(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="date-wrap">
-                    <label className="date-label">Preferred delivery date</label>
-                    <input
-                      className="form-input full"
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          {/* RIGHT: ORDER SUMMARY (sticky) */}
-          <div className="cart-right">
-            <div className="order-summary">
-              <h3 className="summary-title">Order Summary</h3>
-
-              <div className="summary-rows">
-                <div className="summary-row">
-                  <span>Items ({items.reduce((s, i) => s + i.qty, 0)})</span>
-                  <span>{formatPrice(total)} сум</span>
-                </div>
-                <div className="summary-row">
-                  <span>Delivery</span>
-                  <span className="summary-free">FREE</span>
-                </div>
-              </div>
-
-              <div className="summary-divider" />
-
-              <div className="summary-total-row">
-                <span>Total amount:</span>
-                <span className="summary-total">{formatPrice(total)} сум</span>
-              </div>
-
-              <button className="checkout-btn">
-                Checkout now
-              </button>
-
-              <p className="summary-agreement">
-                By clicking "Checkout now", I agree to the{" "}
-                <a href="#">User Agreement</a> and Privacy Policy.
-              </p>
-
-              <div className="summary-perks">
-                <div className="summary-perk">
-                  <FiTruck />
-                  <span>Free delivery</span>
-                </div>
-                <div className="summary-perk">
-                  <FiShield />
-                  <span>Secure checkout</span>
-                </div>
-              </div>
+              </form>
             </div>
           </div>
-
-        </div>
+        )}
       </div>
     </main>
   );

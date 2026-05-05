@@ -1,17 +1,20 @@
-import { use, useState } from "react";
+import { useState, useContext } from "react";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import { loginFunction } from "../services";
 import { useNavigate } from "react-router-dom";
-import { setToken } from "../services/token";
+import { DataContext } from "../App";
 import "../styles/login.css";
 
 export default function Login({ setTokenTitle }) {
   const [showPass, setShowPass] = useState(false);
-
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+  const { setToken, refreshCart, refreshLikes } = useContext(DataContext);
+
   return (
     <section className="login-section">
       <div>
@@ -24,57 +27,53 @@ export default function Login({ setTokenTitle }) {
 
         <form
           className="login-form"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            if (!username || !password) {
-              return;
+            if (!username || !password) return;
+            setError("");
+            setLoading(true);
+            const info = await loginFunction(username, password);
+            setLoading(false);
+            if (info?.access) {
+              localStorage.setItem("token", info.access);
+              setToken(info.access);
+              if (setTokenTitle) setTokenTitle(info.access);
+              refreshCart(info.access);
+              refreshLikes(info.access);
+              navigate("/");
+            } else {
+              setError("Login yoki parol noto'g'ri");
             }
-            loginFunction(username, password)
-              ?.then((info) => {
-                if (info?.access) {
-                  localStorage.setItem("token", info.access);
-                  navigate("/");
-                  setToken(info.access);
-                  setTokenTitle(info.access);
-                }
-              })
-              .catch(() => {});
           }}
         >
           <input
-            onInput={(e) => {
-              setUsername(e.target.value);
-            }}
+            onInput={(e) => setUsername(e.target.value)}
             type="text"
-            placeholder="Email or Phone Number"
+            placeholder="Username yoki Email"
             className="login-input"
           />
 
           <div className="login-password-wrapper">
             <input
-              onInput={(e) => {
-                setPassword(e.target.value);
-              }}
+              onInput={(e) => setPassword(e.target.value)}
               type={showPass ? "text" : "password"}
-              placeholder="Password"
+              placeholder="Parol"
               className="login-password-input"
             />
-
-            <span
-              onClick={() => setShowPass(!showPass)}
-              className="login-eye-icon"
-            >
+            <span onClick={() => setShowPass(!showPass)} className="login-eye-icon">
               {showPass ? <AiOutlineEyeInvisible /> : <AiOutlineEye />}
             </span>
           </div>
 
-          <button type="submit" className="login-button">
-            Log In
+          {error && <p style={{ color: "#ed3729", fontSize: 13, margin: "0 0 4px" }}>{error}</p>}
+
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? "Kirish..." : "Kirish"}
           </button>
         </form>
 
         <button type="button" className="login-forget-pass">
-          Forget Password?
+          Parolni unutdingizmi?
         </button>
       </div>
     </section>

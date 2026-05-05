@@ -14,20 +14,28 @@ import { RiScalesFill } from "react-icons/ri";
 import { MdVerified } from "react-icons/md";
 import { DataContext } from "../App";
 import { baseUrl } from "../services/config";
-import Card from "../components/Card";
+import { addToCart, removeCartItem, addLike, removeLike } from "../services";
+import Card, { CardSkeleton } from "../components/Card";
 import "../styles/productdetail.css";
 
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { token } = useContext(DataContext);
+  const { token, cartItems, refreshCart, likedItems, refreshLikes } = useContext(DataContext);
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [similarProducts, setSimilarProducts] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [activeTab, setActiveTab] = useState("specs");
-  const [addedToCart, setAddedToCart] = useState(false);
+  const [cartLoading, setCartLoading] = useState(false);
+  const [likeLoading, setLikeLoading] = useState(false);
+
+  // Check cart/like status
+  const cartItem = cartItems.find((c) => c.product === parseInt(id));
+  const likeItem = likedItems.find((l) => l.product === parseInt(id));
+  const isInCart = !!cartItem;
+  const isLiked = !!likeItem;
 
   useEffect(() => {
     setLoading(true);
@@ -54,13 +62,36 @@ function ProductDetail() {
       .catch(() => setLoading(false));
   }, [id]);
 
-  const handleCartAction = () => {
-    if (!token) {
-      navigate("/signup");
-      return;
+  const handleCartAction = async () => {
+    if (!token) { navigate("/signup"); return; }
+    if (cartLoading) return;
+    setCartLoading(true);
+    try {
+      if (isInCart) {
+        await removeCartItem(token, cartItem.id);
+      } else {
+        await addToCart(token, parseInt(id), 1);
+      }
+      await refreshCart(token);
+    } finally {
+      setCartLoading(false);
     }
-    setAddedToCart(true);
-    setTimeout(() => setAddedToCart(false), 2000);
+  };
+
+  const handleLikeAction = async () => {
+    if (!token) { navigate("/signup"); return; }
+    if (likeLoading) return;
+    setLikeLoading(true);
+    try {
+      if (isLiked) {
+        await removeLike(token, likeItem.id);
+      } else {
+        await addLike(token, parseInt(id));
+      }
+      await refreshLikes(token);
+    } finally {
+      setLikeLoading(false);
+    }
   };
 
   const formatPrice = (price) => {
@@ -181,30 +212,34 @@ function ProductDetail() {
 
             <div className="pd-actions">
               <button
-                className={`pd-btn-cart ${addedToCart ? "added" : ""}`}
+                className={`pd-btn-cart ${isInCart ? "added" : ""}`}
                 onClick={handleCartAction}
+                disabled={cartLoading}
               >
-                {addedToCart ? (
-                  <>
-                    <FiCheck /> Added!
-                  </>
+                {cartLoading ? (
+                  <span className="pd-btn-spinner" />
+                ) : isInCart ? (
+                  <><FiCheck /> Savatchada</>
                 ) : (
-                  <>
-                    <FiShoppingCart /> IN CART
-                  </>
+                  <><FiShoppingCart /> SAVATCHAGA</>
                 )}
               </button>
-              <button className="pd-btn-installment" >
-                IN INSTALLMENTS
+              <button className="pd-btn-installment">
+                BO'LIB TO'LASH
               </button>
             </div>
 
             <div className="pd-icon-actions">
-              <button className="pd-icon-btn" >
-                <FiHeart /> <span>Wishlist</span>
+              <button
+                className={`pd-icon-btn ${isLiked ? "pd-icon-liked" : ""}`}
+                onClick={handleLikeAction}
+                disabled={likeLoading}
+              >
+                {likeLoading ? <span className="pd-btn-spinner-sm" /> : <FiHeart />}
+                <span>{isLiked ? "Sevimlilardan o'chirish" : "Sevimlilarga"}</span>
               </button>
-              <button className="pd-icon-btn" >
-                <RiScalesFill /> <span>Compare</span>
+              <button className="pd-icon-btn">
+                <RiScalesFill /> <span>Solishtirish</span>
               </button>
             </div>
 
@@ -314,8 +349,7 @@ function ProductDetail() {
               {similarProducts.map((item) => (
                 <Card key={item.id} data={item} />
               ))}
-            </div>
-          </section>
+            </div>          </section>
         )}
       </div>
     </main>

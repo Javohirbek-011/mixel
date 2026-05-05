@@ -21,6 +21,7 @@ function Navbar() {
   const [categoryModal, setCategoryModal] = useState(false);
   const [userModal, setUserModal] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState(null);
+  const [hoveredProduct, setHoveredProduct] = useState(null);
   const [categoryProducts, setCategoryProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const hoverTimeout = useRef(null);
@@ -34,7 +35,7 @@ function Navbar() {
   const searchTimeout = useRef(null);
   const navigate = useNavigate();
 
-  const { token, setToken, categoryData } = useContext(DataContext);
+  const { token, setToken, categoryData, cartItems, likedItems } = useContext(DataContext);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -45,6 +46,7 @@ function Navbar() {
   const handleCategoryHover = (category) => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
     setHoveredCategory(category);
+    setHoveredProduct(null);
     setLoadingProducts(true);
     setCategoryProducts([]);
     fetch(`${baseUrl}products/?category=${category.id}`)
@@ -52,6 +54,7 @@ function Navbar() {
       .then((data) => {
         const items = data?.results || data || [];
         setCategoryProducts(items.slice(0, 8));
+        setHoveredProduct(items[0] || null);
         setLoadingProducts(false);
       })
       .catch(() => setLoadingProducts(false));
@@ -60,6 +63,7 @@ function Navbar() {
   const closeModal = () => {
     setCategoryModal(false);
     setHoveredCategory(null);
+    setHoveredProduct(null);
     setCategoryProducts([]);
   };
 
@@ -129,7 +133,7 @@ function Navbar() {
     };
   }, []);
 
-  const bannerProduct = categoryProducts[0] || null;
+  const bannerProduct = hoveredProduct || categoryProducts[0] || null;
 
   const formatPrice = (price) => {
     if (!price) return "";
@@ -279,16 +283,23 @@ function Navbar() {
                 <span>Compare</span>
               </button>
 
-              <button className="action-btn">
-                <FiHeart className="action-icon-svg" />
-                <span>Favorites</span>
-              </button>
+              <Link to="/wishlist" className="action-btn" style={{ textDecoration: "none" }}>
+                <div style={{ position: "relative", display: "inline-flex" }}>
+                  <FiHeart className="action-icon-svg" />
+                  {likedItems.length > 0 && (
+                    <span className="cart-badge like-badge">{likedItems.length}</span>
+                  )}
+                </div>
+                <span>Sevimlilar</span>
+              </Link>
 
               <Link to="/cart" className="cart-link">
                 <button className="action-btn cart-btn">
                   <FiShoppingCart className="action-icon-svg" />
-                  <span className="cart-badge">2</span>
-                  <span>Basket</span>
+                  {cartItems.length > 0 && (
+                    <span className="cart-badge">{cartItems.length}</span>
+                  )}
+                  <span>Savatcha</span>
                 </button>
               </Link>
             </div>
@@ -374,8 +385,9 @@ function Navbar() {
                         <Link
                           key={p.id}
                           to={`/product/${p.id}`}
-                          className="mega-product-row"
+                          className={`mega-product-row ${hoveredProduct?.id === p.id ? "active" : ""}`}
                           onClick={closeModal}
+                          onMouseEnter={() => setHoveredProduct(p)}
                         >
                           <span className="mega-row-dot" />
                           <span className="mega-row-name">
@@ -384,7 +396,7 @@ function Navbar() {
                         </Link>
                       ))
                     ) : (
-                      <p className="mega-empty">No products found</p>
+                      <p className="mega-empty">Mahsulot topilmadi</p>
                     )}
                   </div>
                 </>
@@ -392,7 +404,17 @@ function Navbar() {
             </div>
 
             <div className="mega-banner">
-              {hoveredCategory?.image && (
+              {/* Hovered mahsulot rasmi */}
+              {categoryProducts.length > 0 && !loadingProducts ? (
+                <div className="mega-banner-product-img">
+                  <img
+                    src={bannerProduct?.main_image}
+                    alt={bannerProduct?.name}
+                    className="mega-banner-img"
+                    onError={(e) => { e.target.style.display = "none"; }}
+                  />
+                </div>
+              ) : hoveredCategory?.image ? (
                 <div className="mega-banner-img-wrap">
                   <img
                     src={hoveredCategory.image}
@@ -400,22 +422,22 @@ function Navbar() {
                     className="mega-banner-img"
                   />
                 </div>
-              )}
+              ) : null}
               {bannerProduct && (
                 <div className="mega-banner-card">
-                  <p className="mega-banner-label">SPECIAL OFFER</p>
+                  <p className="mega-banner-label">MAXSUS TAKLIF</p>
                   <p className="mega-banner-title">
                     {bannerProduct.name || bannerProduct.details?.slice(0, 40)}
                   </p>
                   <p className="mega-banner-from">
-                    from {bannerProduct.price} sum
+                    {Number(bannerProduct.discount_price || bannerProduct.price).toLocaleString("ru-RU")} so'm dan
                   </p>
                   <Link
                     to={`/product/${bannerProduct.id}`}
                     className="mega-banner-btn"
                     onClick={closeModal}
                   >
-                    Shop now →
+                    Ko'rish →
                   </Link>
                 </div>
               )}

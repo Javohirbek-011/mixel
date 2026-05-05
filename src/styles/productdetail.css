@@ -285,6 +285,37 @@
   background: #22c55e;
 }
 
+.pd-btn-cart:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.pd-btn-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: pd-spin 0.6s linear infinite;
+}
+
+.pd-btn-spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ddd;
+  border-top-color: #ed3729;
+  border-radius: 50%;
+  animation: pd-spin 0.6s linear infinite;
+}
+
+.pd-icon-btn.pd-icon-liked {
+  border-color: #ed3729;
+  color: #ed3729;
+  background: #fff5f4;
+}
+
 .pd-btn-installment {
   flex: 1;
   height: 50px;
